@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加密代码编辑器</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs/loader.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        .sidebar {
+            width: 250px;
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: white;
+        }
+        .header {
+            background: #3498db;
+            color: white;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .editor-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #editor {
+            flex: 1;
+            border: none;
+        }
+        .toolbar {
+            background: #ecf0f1;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #bdc3c7;
+        }
+        .toolbar-left, .toolbar-right {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .btn {
+            padding: 8px 16px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+        .btn-success {
+            background: #2ecc71;
+        }
+        .btn-success:hover {
+            background: #27ae60;
+        }
+        .btn-danger {
+            background: #e74c3c;
+        }
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        .btn-warning {
+            background: #f39c12;
+        }
+        .btn-warning:hover {
+            background: #d35400;
+        }
+        .status {
+            padding: 12px 20px;
+            border-radius: 4px;
+            display: none;
+            margin: 10px 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .breadcrumb {
+                display: flex;
+                align-items: center;
+                padding: 8px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 4px;
+                margin-bottom: 8px;
+                font-size: 12px;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+            
+            .breadcrumb-item {
+                color: #3498db;
+                cursor: pointer;
+                padding: 4px 8px;
+                border-radius: 3px;
+                transition: background-color 0.2s;
+            }
+            
+            .breadcrumb-item:hover {
+                background-color: rgba(52, 152, 219, 0.1);
+            }
+            
+            .breadcrumb-separator {
+                color: #95a5a6;
+                margin: 0 4px;
+            }
+            
+            .file-list {
+                margin-top: 20px;
+                flex: 1;
+                overflow-y: auto;
+                border-radius: 6px;
+                background: rgba(255, 255, 255, 0.05);
+                padding: 10px;
+            }
+        .file-item {
+                padding: 8px 10px;
+                margin-bottom: 6px;
+                background: #34495e;
+                border-radius: 4px;
+                cursor: pointer;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                transition: all 0.3s;
+                border-left: 2px solid transparent;
+                font-size: 13px;
+            }
+            
+            .file-item.directory {
+                background: #2c3e50;
+            }
+            
+            .file-item.directory:hover {
+                background: #3d566e;
+            }
+        .file-item:hover {
+            background: #3d566e;
+            transform: translateX(5px);
+            border-left: 3px solid #3498db;
+        }
+        .file-item.active {
+            background: #3498db;
+            border-left: 3px solid #2ecc71;
+        }
+        .file-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .file-action {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 3px;
+            transition: background 0.3s;
+        }
+        .file-action:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .search-box {
+            margin-top: 15px;
+            position: relative;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 8px 8px 8px 30px;
+            border-radius: 4px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 13px;
+        }
+        .search-box i {
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #bdc3c7;
+        }
+        .file-info {
+            margin-top: 15px;
+            font-size: 0.8em;
+            color: #bdc3c7;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+        .file-info p {
+            margin: 4px 0;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(3px);
+        }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            width: 450px;
+            max-width: 90%;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            animation: modalFadeIn 0.3s;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #7f8c8d;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border 0.3s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: #3498db;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .theme-selector, .language-selector {
+            margin-top: 15px;
+        }
+        .theme-selector label, .language-selector label {
+            display: block;
+            margin-bottom: 6px;
+            color: #ecf0f1;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .theme-selector select, .language-selector select {
+            width: 100%;
+            padding: 8px;
+            border-radius: 4px;
+            border: none;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .theme-selector select option, .language-selector select option {
+            background: #2c3e50;
+            color: white;
+            padding: 8px;
+        }
+        .file-icon {
+            margin-right: 10px;
+            width: 16px;
+            text-align: center;
+        }
+        .directory {
+            font-weight: bold;
+        }
+        .refresh-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 5px;
+            margin-left: 10px;
+            border-radius: 3px;
+            transition: background 0.3s;
+        }
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .file-size {
+            font-size: 0.8em;
+            color: #95a5a6;
+            margin-left: 10px;
+        }
+        .sidebar-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .logo h2 {
+            font-size: 1.1em;
+            margin: 0;
+        }
+        .logo i {
+            font-size: 1.3em;
+            color: #3498db;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #bdc3c7;
+        }
+        .empty-state i {
+            font-size: 3em;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        .error-state {
+            text-align: center;
+            padding: 30px;
+            color: #e74c3c;
+        }
+        .error-state i {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        
+        /* 工具栏中的语言选择器样式 */
+        .toolbar .language-selector {
+            margin-top: 0;
+        }
+        
+        .toolbar .language-selector select {
+            background: white;
+            color: #333;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            padding: 6px 10px;
+            font-size: 13px;
+        }
+        
+        .toolbar .language-selector select option {
+            background: white;
+            color: #333;
+        }
+        
+        .filename-hint {
+            font-size: 0.8em;
+            color: #95a5a6;
+            margin-top: 5px;
+        }
+        
+        /* 加密设置区域 */
+        .crypto-settings {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+        
+        .crypto-settings h3 {
+            margin-bottom: 12px;
+            font-size: 1em;
+            color: #3498db;
+        }
+        
+        .crypto-settings .form-group {
+            margin-bottom: 12px;
+        }
+        
+        .crypto-settings .form-group label {
+            color: #ecf0f1;
+            font-size: 0.85em;
+        }
+        
+        .crypto-settings .form-group input[type="file"] {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 6px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .status-panel {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 20px;
+            font-family: monospace;
+            font-size: 12px;
+            height: 120px;
+            overflow-y: auto;
+            border-top: 1px solid #34495e;
+        }
+        
+        .status-panel .status-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #3498db;
+        }
+        
+        .status-message {
+            margin-bottom: 5px;
+            opacity: 0.9;
+        }
+        
+        .status-message.success {
+            color: #2ecc71;
+        }
+        
+        .status-message.error {
+            color: #e74c3c;
+        }
+        
+        .status-message.info {
+            color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-title">
+                <div class="logo">
+                    <i class="fas fa-code"></i>
+                    <h2>文件浏览器</h2>
+                </div>
+                <button class="refresh-btn" id="refresh-files" title="刷新文件列表">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            
+            <!-- 加密设置 -->
+            <div class="crypto-settings">
+                <h3><i class="fas fa-lock"></i> 加密设置</h3>
+                <div class="form-group">
+                    <label for="privateKeyFile">RSA 私钥文件 (.pem):</label>
+                    <input type="file" id="privateKeyFile" accept=".pem" required>
+                </div>
+            </div>
+            
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="file-search" placeholder="搜索文件...">
+            </div>
+            
+            <!-- 导航路径 -->
+            <div class="breadcrumb" id="breadcrumb">
+                <span class="breadcrumb-item" data-path="">/</span>
+            </div>
+            
+            <div class="file-list" id="file-list">
+                <div class="empty-state">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>加载中...</p>
+                </div>
+            </div>
+            
+            <div class="theme-selector">
+                <label for="theme-select">编辑器主题:</label>
+                <select id="theme-select">
+                    <option value="vs">浅色主题</option>
+                    <option value="vs-dark">深色主题</option>
+                    <option value="hc-black">高对比度</option>
+                </select>
+            </div>
+            
+            <div class="file-info">
+                <p><i class="fas fa-info-circle"></i> 双击文件进行编辑</p>
+                <p><i class="fas fa-save"></i> Ctrl+S 快速保存</p>
+                <p><i class="fas fa-lock"></i> 加密上传保护代码安全</p>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="header">
+                <h1><i class="fas fa-laptop-code"></i> 加密代码编辑器</h1>
+                <div>
+                    <span id="current-file">未选择文件</span>
+                </div>
+            </div>
+            
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <button class="btn" id="new-file-btn">
+                        <i class="fas fa-file"></i> 新建文件
+                    </button>
+                    <button class="btn btn-success" id="save-btn">
+                        <i class="fas fa-save"></i> 保存
+                    </button>
+                    <button class="btn btn-warning" id="upload-btn">
+                        <i class="fas fa-upload"></i> 加密上传
+                    </button>
+                </div>
+                <div class="toolbar-right">
+                    <div class="language-selector">
+                        <select id="language-select">
+                            <option value="plaintext">纯文本</option>
+                            <option value="python">Python</option>
+                            <option value="javascript">JavaScript</option>
+                            <option value="html">HTML</option>
+                            <option value="css">CSS</option>
+                            <option value="json">JSON</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="bash">Bash</option>
+                            <option value="cpp">C++</option>
+                            <option value="java">Java</option>
+                            <option value="csharp">C#</option>
+                            <option value="php">PHP</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="editor-container">
+                <div id="editor"></div>
+            </div>
+            
+            <!-- 状态面板 -->
+            <div class="status-panel">
+                <div class="status-title">状态信息:</div>
+                <div id="status-messages"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 新建文件模态框 -->
+    <div class="modal" id="new-file-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-file"></i> 新建文件</h3>
+                <button class="modal-close" id="close-new-file-modal">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="new-filename">文件名:</label>
+                <input type="text" id="new-filename" placeholder="例如: script.js" required>
+            </div>
+            <div class="form-group">
+                <label for="file-type">文件类型:</label>
+                <select id="file-type">
+                    <option value="">自动检测</option>
+                    <option value="javascript">JavaScript (.js)</option>
+                    <option value="html">HTML (.html)</option>
+                    <option value="css">CSS (.css)</option>
+                    <option value="python">Python (.py)</option>
+                    <option value="json">JSON (.json)</option>
+                    <option value="plaintext">文本文件 (.txt)</option>
+                    <option value="markdown">Markdown (.md)</option>
+                    <option value="bash">Bash (.sh)</option>
+                    <option value="cpp">C++ (.cpp)</option>
+                    <option value="java">Java (.java)</option>
+                    <option value="csharp">C# (.cs)</option>
+                    <option value="php">PHP (.php)</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" id="cancel-new-file">取消</button>
+                <button class="btn btn-success" id="create-new-file">创建</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化变量
+            let editor;
+            let currentFile = null;
+            let currentPath = '';
+            
+            // 8.3格式扩展名映射
+            const extensionMap = {
+                'JS': 'javascript',
+                'HTM': 'html',
+                'HTML': 'html',
+                'CSS': 'css',
+                'PY': 'python',
+                'JSO': 'json',
+                'JSON': 'json',
+                'TXT': 'plaintext',
+                'MD': 'markdown',
+                'SH': 'bash',
+                'CPP': 'cpp',
+                'C': 'cpp',
+                'H': 'cpp',
+                'JAVA': 'java',
+                'CS': 'csharp',
+                'PHP': 'php'
+            };
+            
+            // DOM元素
+            const statusMessages = document.getElementById('status-messages');
+            const saveButton = document.getElementById('save-btn');
+            const newFileButton = document.getElementById('new-file-btn');
+            const uploadButton = document.getElementById('upload-btn');
+            const fileList = document.getElementById('file-list');
+            const currentFileDisplay = document.getElementById('current-file');
+            const themeSelect = document.getElementById('theme-select');
+            const languageSelect = document.getElementById('language-select');
+            const fileSearch = document.getElementById('file-search');
+            const refreshFilesButton = document.getElementById('refresh-files');
+            const privateKeyFileInput = document.getElementById('privateKeyFile');
+            
+            // 模态框元素
+            const newFileModal = document.getElementById('new-file-modal');
+            const newFilenameInput = document.getElementById('new-filename');
+            const fileTypeSelect = document.getElementById('file-type');
+            
+            // 初始化Monaco编辑器
+            require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs' }});
+            require(['vs/editor/editor.main'], function() {
+                editor = monaco.editor.create(document.getElementById('editor'), {
+                    value: '',
+                    language: 'plaintext',
+                    theme: 'vs',
+                    automaticLayout: true,
+                    fontSize: 14,
+                    minimap: { enabled: true },
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'on',
+                    lineNumbers: 'on',
+                    folding: true,
+                    renderWhitespace: 'selection',
+                    formatOnPaste: true,
+                    formatOnType: true
+                });
+                
+                // 加载文件列表
+                loadFileList('');
+            });
+            
+            // Web Crypto API helper functions
+            class CryptoHelper {
+                // Check if Web Crypto API is available
+                static isCryptoAvailable() {
+                    if (!window.crypto) {
+                        throw new Error('Web Crypto API is not available in this browser');
+                    }
+                    if (!window.crypto.subtle) {
+                        throw new Error('Web Crypto API subtle operations are not available. This may be due to insecure connection (not HTTPS) or browser restrictions.');
+                    }
+                    return true;
+                }
+                
+                static async importRsaPrivateKey(pem) {
+                    // Check if Web Crypto API is available
+                    this.isCryptoAvailable();
+                    let pemHeader, pemFooter, keyFormat;
+                    if (pem.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+                        pemHeader = "-----BEGIN RSA PRIVATE KEY-----";
+                        pemFooter = "-----END RSA PRIVATE KEY-----";
+                        keyFormat = "pkcs1";
+                        updateStatus('  ✓ Detected PKCS#1 private key format', 'success');
+                    } else if (pem.includes("-----BEGIN PRIVATE KEY-----")) {
+                        pemHeader = "-----BEGIN PRIVATE KEY-----";
+                        pemFooter = "-----END PRIVATE KEY-----";
+                        keyFormat = "pkcs8";
+                        updateStatus('  ✓ Detected PKCS#8 private key format', 'success');
+                    } else {
+                        throw new Error("Invalid PEM format: unknown header");
+                    }
+                    
+                    const headerIndex = pem.indexOf(pemHeader);
+                    const footerIndex = pem.indexOf(pemFooter);
+                    
+                    if (headerIndex === -1 || footerIndex === -1) {
+                        throw new Error("Invalid PEM format: missing header or footer");
+                    }
+                    
+                    let pemContents = pem.slice(headerIndex + pemHeader.length, footerIndex);
+                    pemContents = pemContents.replace(/\s+/g, "");
+                    
+                    updateStatus('  PEM contents length: ' + pemContents.length, 'info');
+                    updateStatus('  PEM contents: ' + pemContents.substring(0, 50) + '...', 'info');
+                    
+                    pemContents = pemContents.replace(/-/g, '+').replace(/_/g, '/');
+                    const padding = (4 - pemContents.length % 4) % 4;
+                    if (padding > 0) {
+                        pemContents += "=".repeat(padding);
+                    }
+                    
+                    const binaryString = window.atob(pemContents);
+                    updateStatus('  ✓ Successfully decoded PEM using atob', 'success');
+                    updateStatus('  Binary string length: ' + binaryString.length, 'info');
+                    
+                    const binaryDer = this.stringToArrayBuffer(binaryString);
+                    
+                    const algorithm = {
+                        name: "RSA-OAEP",
+                        hash: {
+                            name: "SHA-256"
+                        }
+                    };
+                    
+                    if (keyFormat === "pkcs1") {
+                        algorithm.name = "RSA-OAEP-256";
+                        updateStatus('  Using RSA-OAEP-256 algorithm for PKCS#1 key', 'info');
+                    }
+                    
+                    updateStatus(`  Importing private key using ${keyFormat} format...`, 'info');
+                    
+                    try {
+                        return await window.crypto.subtle.importKey(
+                            keyFormat,
+                            binaryDer,
+                            algorithm,
+                            false,
+                            ["decrypt"]
+                        );
+                    } catch (e) {
+                        updateStatus('  ✗ First import attempt failed: ' + (e.message || 'Unknown error'), 'error');
+                        updateStatus('  Error name: ' + (e.name || 'Unknown name'), 'error');
+                        
+                        algorithm.name = "RSA-OAEP";
+                        updateStatus('  Trying again with standard RSA-OAEP algorithm...', 'info');
+                        
+                        return await window.crypto.subtle.importKey(
+                            keyFormat,
+                            binaryDer,
+                            algorithm,
+                            false,
+                            ["decrypt"]
+                        );
+                    }
+                }
+                
+                static stringToArrayBuffer(str) {
+                    const buf = new ArrayBuffer(str.length);
+                    const bufView = new Uint8Array(buf);
+                    for (let i = 0; i < str.length; i++) {
+                        bufView[i] = str.charCodeAt(i);
+                    }
+                    return buf;
+                }
+                
+                static async decryptRsa(privateKey, encryptedData) {
+                    try {
+                        const decryptParams = {
+                            name: "RSA-OAEP",
+                            hash: {
+                                name: "SHA-256"
+                            },
+                            mgf: {
+                                name: "MGF1",
+                                hash: {
+                                    name: "SHA-256"
+                                }
+                            }
+                        };
+                        
+                        updateStatus('  Decrypt params: ' + JSON.stringify(decryptParams), 'info');
+                        updateStatus('  Private key algorithm: ' + JSON.stringify(privateKey.algorithm), 'info');
+                        
+                        return await window.crypto.subtle.decrypt(
+                            decryptParams,
+                            privateKey,
+                            encryptedData
+                        );
+                    } catch (e) {
+                        updateStatus('  ✗ RSA decryption failed: ' + (e.message || 'Unknown error'), 'error');
+                        updateStatus('  Error name: ' + (e.name || 'Unknown name'), 'error');
+                        updateStatus('  Error stack: ' + (e.stack || 'No stack trace'), 'error');
+                        
+                        try {
+                            updateStatus('  Trying simpler decrypt params...', 'info');
+                            return await window.crypto.subtle.decrypt(
+                                {
+                                    name: "RSA-OAEP"
+                                },
+                                privateKey,
+                                encryptedData
+                            );
+                        } catch (e2) {
+                            updateStatus('  ✗ Simple params also failed: ' + (e2.message || 'Unknown error'), 'error');
+                            throw e;
+                        }
+                    }
+                }
+                
+                static async encryptAes(key, iv, data) {
+                    const cipher = await window.crypto.subtle.encrypt(
+                        {
+                            name: "AES-GCM",
+                            iv: iv,
+                            tagLength: 128
+                        },
+                        key,
+                        data
+                    );
+                    return cipher;
+                }
+                
+                static async importAesKey(rawKey) {
+                    return await window.crypto.subtle.importKey(
+                        "raw",
+                        rawKey,
+                        {
+                            name: "AES-GCM",
+                            length: rawKey.length * 8
+                        },
+                        false,
+                        ["encrypt"]
+                    );
+                }
+                
+                static base64ToUint8Array(base64) {
+                    updateStatus('  Base64 string: ' + base64.substring(0, 50) + '...', 'info');
+                    
+                    base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+                    const padding = (4 - base64.length % 4) % 4;
+                    if (padding > 0) {
+                        base64 += '='.repeat(padding);
+                    }
+                    
+                    const binaryString = window.atob(base64);
+                    updateStatus('  ✓ Successfully decoded base64 using atob', 'success');
+                    updateStatus('  Binary string length: ' + binaryString.length, 'info');
+                    
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    return bytes;
+                }
+            }
+            
+            // 显示状态消息
+            function updateStatus(message, type = 'info') {
+                const messageElement = document.createElement('div');
+                messageElement.className = `status-message ${type}`;
+                messageElement.textContent = message;
+                
+                statusMessages.appendChild(messageElement);
+                statusMessages.scrollTop = statusMessages.scrollHeight;
+                
+                // 保留最多50条消息
+                if (statusMessages.children.length > 50) {
+                    statusMessages.removeChild(statusMessages.firstChild);
+                }
+            }
+            
+            // 刷新文件列表按钮事件
+            refreshFilesButton.addEventListener('click', function() {
+                loadFileList(currentPath);
+            });
+            
+            // 获取文件列表
+            async function loadFileList(path = '') {
+                // 先更新currentPath变量
+                currentPath = path;
+                
+                try {
+                    fileList.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>加载中...</p></div>';
+                    
+                    // 更新导航路径显示
+                    updateBreadcrumb(path);
+                    
+                    // 使用GET请求获取目录内容
+                    const response = await fetch('/' + path);
+                    if (!response.ok) {
+                        throw new Error(`服务器返回错误: ${response.status} ${response.statusText}`);
+                    }
+                    
+                    // 解析HTML响应
+                    const htmlText = await response.text();
+                    
+                    // 解析HTML提取文件列表
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlText, 'text/html');
+                    
+                    // 查找所有文件链接
+                    const fileLinks = doc.querySelectorAll('.file-name');
+                    const dirLinks = doc.querySelectorAll('.dir-name');
+                    
+                    const files = [];
+                    
+                    // 处理目录
+                    dirLinks.forEach(link => {
+                        const name = link.textContent;
+                        // 跳过父目录链接
+                        if (name !== '..') {
+                            files.push({
+                                name: name,
+                                type: 'directory',
+                                icon: 'fas fa-folder',
+                                size: 0
+                            });
+                        }
+                    });
+                    
+                    // 处理文件
+                    fileLinks.forEach(link => {
+                        const name = link.textContent;
+                        // 查找对应的大小
+                        const row = link.closest('tr');
+                        const sizeText = row.querySelector('.file-size');
+                        const size = sizeText ? parseInt(sizeText.textContent) : 0;
+                        
+                        files.push({
+                            name: name,
+                            type: 'file',
+                            icon: getFileIcon(name),
+                            size: size
+                        });
+                    });
+                    
+                    if (files.length === 0) {
+                        fileList.innerHTML = '<div class="empty-state"><i class="fas fa-folder-open"></i><p>目录为空</p></div>';
+                        updateStatus('目录为空', 'info');
+                    } else {
+                        renderFileList(files);
+                        updateStatus(`已加载 ${files.length} 个文件`, 'success');
+                    }
+                    
+                } catch (error) {
+                    console.error('加载文件列表失败:', error);
+                    fileList.innerHTML = `<div class="error-state">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>加载文件列表失败</p>
+                        <p style="font-size: 0.8em; margin-top: 10px;">${error.message}</p>
+                        <button class="btn" onclick="location.reload()" style="margin-top: 15px; background: #e74c3c;">
+                            <i class="fas fa-redo"></i> 重新加载
+                        </button>
+                    </div>`;
+                    updateStatus('加载文件列表失败: ' + error.message, 'error');
+                }
+            }
+            
+            // 根据文件扩展名获取图标
+            function getFileIcon(filename) {
+                const basename = filename.split('/').pop();
+                const ext = getFileExtension(basename).toUpperCase();
+                switch(ext) {
+                    case 'JS': return 'fas fa-file-code';
+                    case 'HTM': return 'fas fa-file-code';
+                    case 'HTML': return 'fas fa-file-code';
+                    case 'CSS': return 'fas fa-file-code';
+                    case 'PY': return 'fas fa-file-code';
+                    case 'JSO': return 'fas fa-file-code';
+                    case 'JSON': return 'fas fa-file-code';
+                    case 'MD': return 'fas fa-file-alt';
+                    case 'TXT': return 'fas fa-file-alt';
+                    case 'SH': return 'fas fa-file-code';
+                    case 'CPP': return 'fas fa-file-code';
+                    case 'C': return 'fas fa-file-code';
+                    case 'H': return 'fas fa-file-code';
+                    case 'JAVA': return 'fas fa-file-code';
+                    case 'CS': return 'fas fa-file-code';
+                    case 'PHP': return 'fas fa-file-code';
+                    default: return 'fas fa-file';
+                }
+            }
+            
+            // 格式化文件大小显示
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                const validIndex = Math.min(i, sizes.length - 1);
+                
+                return parseFloat((bytes / Math.pow(k, validIndex)).toFixed(2)) + ' ' + sizes[validIndex];
+            }
+            
+            // 获取文件扩展名
+            function getFileExtension(filename) {
+                const basename = filename.split('/').pop();
+                const parts = basename.split('.');
+                return parts.length > 1 ? parts[parts.length - 1] : '';
+            }
+            
+            // 根据扩展名设置语言
+            function setLanguageByExtension(filename) {
+                const basename = filename.split('/').pop();
+                const extension = getFileExtension(basename).toUpperCase();
+                let language = extensionMap[extension] || 'plaintext';
+                
+                monaco.editor.setModelLanguage(editor.getModel(), language);
+                languageSelect.value = language;
+            }
+            
+            // 渲染文件列表
+            function renderFileList(files) {
+                if (files.length === 0) {
+                    fileList.innerHTML = '<div class="empty-state"><i class="fas fa-folder-open"></i><p>目录为空</p></div>';
+                    return;
+                }
+                
+                fileList.innerHTML = '';
+                
+                files.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = `file-item ${file.type === 'directory' ? 'directory' : ''}`;
+                    
+                    // 格式化文件大小显示
+                    const fileSizeText = file.size !== undefined ? formatFileSize(file.size) : '';
+                    
+                    fileItem.innerHTML = `
+                        <div>
+                            <i class="${file.icon} file-icon"></i>
+                            ${file.name}
+                            ${fileSizeText ? `<span class="file-size">${fileSizeText}</span>` : ''}
+                        </div>
+                        ${file.type === 'file' ? `
+                        <div class="file-actions">
+                            <button class="file-action edit-file" data-filename="${file.name}" title="编辑">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="file-action delete-file" data-filename="${file.name}" title="删除">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        ` : ''}
+                    `;
+                    fileList.appendChild(fileItem);
+                    
+                    if (file.type === 'file') {
+                        // 添加双击编辑事件
+                        fileItem.addEventListener('dblclick', () => {
+                            openFile(file.name);
+                        });
+                        
+                        // 添加编辑按钮事件
+                        fileItem.querySelector('.edit-file').addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            openFile(file.name);
+                        });
+                        
+                        // 添加删除按钮事件
+                        fileItem.querySelector('.delete-file').addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (confirm(`确定要删除文件 "${file.name}" 吗？此操作不可恢复。`)) {
+                                deleteEncryptedFile(file.name);
+                            }
+                        });
+                    } else if (file.type === 'directory') {
+                        // 为目录添加点击事件
+                        fileItem.addEventListener('click', () => {
+                            // 构建新路径并加载新目录的文件列表
+                            const newPath = currentPath ? `${currentPath}/${file.name}` : file.name;
+                            loadFileList(newPath);
+                        });
+                    } else {
+                        fileItem.style.cursor = 'default';
+                        fileItem.querySelector('.file-icon').style.color = '#f39c12';
+                    }
+                });
+            }
+            
+            // 更新导航路径
+            function updateBreadcrumb(path) {
+                const breadcrumb = document.getElementById('breadcrumb');
+                breadcrumb.innerHTML = '<span class="breadcrumb-item" data-path="">/</span>';
+                
+                if (!path) return;
+                
+                const parts = path.split('/');
+                let currentPath = '';
+                
+                parts.forEach((part, index) => {
+                    if (part) {
+                        currentPath += (index === 0 ? '' : '/') + part;
+                        const breadcrumbItem = document.createElement('span');
+                        breadcrumbItem.className = 'breadcrumb-separator';
+                        breadcrumbItem.textContent = '/';
+                        breadcrumb.appendChild(breadcrumbItem);
+                        
+                        const item = document.createElement('span');
+                        item.className = 'breadcrumb-item';
+                        item.textContent = part;
+                        item.dataset.path = currentPath;
+                        breadcrumb.appendChild(item);
+                        
+                        // 添加点击事件
+                        item.addEventListener('click', () => {
+                            loadFileList(item.dataset.path);
+                        });
+                    }
+                });
+            }
+            
+            // 为导航路径项添加事件监听
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('breadcrumb-item')) {
+                    const path = e.target.dataset.path;
+                    loadFileList(path);
+                }
+            });
+            
+            // 打开文件
+            async function openFile(filename) {
+                try {
+                    // 构建完整路径
+                    const fullPath = currentPath ? `${currentPath}/${filename}` : filename;
+                    updateStatus(`打开文件: ${fullPath}`, 'info');
+                    
+                    // 加载文件内容
+                    const response = await fetch('/' + encodeURIComponent(fullPath));
+                    if (!response.ok) {
+                        throw new Error('文件不存在或无法访问');
+                    }
+                    
+                    const content = await response.text();
+                    
+                    // 设置编辑器内容和当前文件
+                    editor.setValue(content);
+                    currentFile = fullPath;
+                    currentFileDisplay.textContent = fullPath;
+                    
+                    // 设置语言
+                    setLanguageByExtension(filename);
+                    
+                    updateStatus(`文件已打开: ${fullPath}`, 'success');
+                } catch (error) {
+                    updateStatus(`打开文件失败: ${error.message}`, 'error');
+                    console.error('打开文件失败:', error);
+                }
+            }
+            
+            // 新建文件按钮事件
+            newFileButton.addEventListener('click', function() {
+                newFilenameInput.value = '';
+                fileTypeSelect.value = '';
+                newFileModal.style.display = 'flex';
+            });
+            
+            // 关闭新建文件模态框
+            document.getElementById('close-new-file-modal').addEventListener('click', function() {
+                newFileModal.style.display = 'none';
+            });
+            
+            // 取消新建文件
+            document.getElementById('cancel-new-file').addEventListener('click', function() {
+                newFileModal.style.display = 'none';
+            });
+            
+            // 创建新文件
+            document.getElementById('create-new-file').addEventListener('click', function() {
+                const filename = newFilenameInput.value.trim();
+                if (!filename) {
+                    updateStatus('文件名不能为空', 'error');
+                    return;
+                }
+                
+                // 创建新文件
+                const fullPath = currentPath ? `${currentPath}/${filename}` : filename;
+                currentFile = fullPath;
+                currentFileDisplay.textContent = fullPath;
+                editor.setValue('');
+                
+                // 设置语言
+                const fileType = fileTypeSelect.value;
+                if (fileType) {
+                    monaco.editor.setModelLanguage(editor.getModel(), fileType);
+                    languageSelect.value = fileType;
+                } else {
+                    setLanguageByExtension(filename);
+                }
+                
+                newFileModal.style.display = 'none';
+                updateStatus(`已创建新文件: ${fullPath}`, 'success');
+            });
+            
+            // 主题切换事件
+            themeSelect.addEventListener('change', function() {
+                monaco.editor.setTheme(this.value);
+                updateStatus(`主题已切换为: ${this.value}`, 'info');
+            });
+            
+            // 语言切换事件
+            languageSelect.addEventListener('change', function() {
+                monaco.editor.setModelLanguage(editor.getModel(), this.value);
+                updateStatus(`语言已切换为: ${this.value}`, 'info');
+            });
+            
+            // 保存按钮事件
+            saveButton.addEventListener('click', async function() {
+                if (!currentFile) {
+                    updateStatus('请先选择或创建文件', 'error');
+                    return;
+                }
+                
+                saveButton.disabled = true;
+                saveButton.textContent = '保存中...';
+                
+                try {
+                    // 调用加密上传函数来保存文件
+                    await uploadEncryptedCode();
+                } finally {
+                    saveButton.disabled = false;
+                    saveButton.textContent = '保存';
+                }
+            });
+            
+            // 文件上传函数
+            async function uploadEncryptedCode() {
+                if (!currentFile) {
+                    updateStatus('请先选择或创建文件', 'error');
+                    return;
+                }
+                
+                updateStatus('开始加密上传过程...', 'info');
+                
+                // Step 1: Get RSA Private Key
+                const privateKeyFile = privateKeyFileInput.files[0];
+                if (!privateKeyFile) {
+                    updateStatus('请选择RSA私钥文件', 'error');
+                    return;
+                }
+                
+                const privateKeyReader = new FileReader();
+                const privateKey = await new Promise((resolve, reject) => {
+                    privateKeyReader.onload = (e) => resolve(e.target.result);
+                    privateKeyReader.onerror = () => reject(new Error('读取私钥文件失败'));
+                    privateKeyReader.readAsText(privateKeyFile);
+                });
+                updateStatus('✓ RSA私钥已成功加载', 'success');
+                
+                // Step 2: Get File Name and Content
+                const fileName = currentFile;
+                const codeContent = editor.getValue();
+                
+                if (!codeContent) {
+                    updateStatus('代码内容不能为空', 'error');
+                    return;
+                }
+                
+                updateStatus('✓ 文件名: ' + fileName, 'info');
+                updateStatus('✓ 代码内容长度: ' + codeContent.length + ' 字符', 'info');
+                
+                // Step 3: Get Encrypted AES Key from Server
+                updateStatus('从服务器请求加密的AES密钥...', 'info');
+                
+                let encryptedAesKeyBase64;
+                try {
+                    const encryptedAesKeyResponse = await fetch('/get-encrypted-aes-key');
+                    if (!encryptedAesKeyResponse.ok) {
+                        throw new Error('获取加密AES密钥失败: ' + encryptedAesKeyResponse.statusText);
+                    }
+                    
+                    const encryptedAesKeyData = await encryptedAesKeyResponse.json();
+                    encryptedAesKeyBase64 = encryptedAesKeyData.encrypted_aes_key;
+                    updateStatus('✓ 加密AES密钥已成功接收', 'success');
+                } catch (error) {
+                    updateStatus('✗ 获取加密AES密钥失败: ' + error.message, 'error');
+                    return;
+                }
+                
+                // Step 4: Decrypt AES Key using RSA Private Key
+                updateStatus('使用RSA私钥解密AES密钥...', 'info');
+                
+                let aesKey;
+                try {
+                    // Import RSA private key
+                    const rsaPrivateKey = await CryptoHelper.importRsaPrivateKey(privateKey);
+                    
+                    // Decode encrypted AES key from base64
+                    updateStatus('  Base64字符串长度: ' + encryptedAesKeyBase64.length, 'info');
+                    
+                    const encryptedAesKey = CryptoHelper.base64ToUint8Array(encryptedAesKeyBase64);
+                    updateStatus('  ✓ 成功解码AES密钥', 'success');
+                    
+                    // Decrypt AES key
+                    updateStatus('  正在解密RSA加密数据...', 'info');
+                    updateStatus('  加密数据长度: ' + encryptedAesKey.length + ' 字节', 'info');
+                    
+                    const decryptedAesKey = await CryptoHelper.decryptRsa(rsaPrivateKey, encryptedAesKey);
+                    aesKey = new Uint8Array(decryptedAesKey);
+                    
+                    updateStatus('✓ AES密钥解密成功', 'success');
+                    updateStatus('  AES密钥大小: ' + (aesKey.length * 8) + ' 位', 'info');
+                } catch (error) {
+                    const errorMsg = error.message || '未知错误';
+                    updateStatus('✗ AES密钥解密失败: ' + errorMsg, 'error');
+                    console.error('解密错误:', error);
+                    return;
+                }
+                
+                // Step 5: Encrypt Code using AES Key
+                updateStatus('使用AES密钥加密代码...', 'info');
+                
+                let encryptedFile;
+                try {
+                    // Convert code to ArrayBuffer
+                    const encoder = new TextEncoder();
+                    const codeBuffer = encoder.encode(codeContent);
+                    
+                    // Generate 16-byte IV (Initialization Vector)
+                    const iv = window.crypto.getRandomValues(new Uint8Array(16));
+                    
+                    // Import AES key
+                    const aesCryptoKey = await CryptoHelper.importAesKey(aesKey);
+                    
+                    // Encrypt code content
+                    const encryptedContent = await CryptoHelper.encryptAes(aesCryptoKey, iv, codeBuffer);
+                    
+                    // Combine IV and encrypted content (IV first, then encrypted content, then tag)
+                    const combined = new Uint8Array(iv.length + encryptedContent.byteLength);
+                    combined.set(iv, 0);
+                    combined.set(new Uint8Array(encryptedContent), iv.length);
+                    
+                    // Create Blob for upload
+                    encryptedFile = new Blob([combined], { type: 'application/octet-stream' });
+                    
+                    updateStatus('✓ 代码加密成功', 'success');
+                    updateStatus('  原始大小: ' + codeBuffer.byteLength + ' 字节', 'info');
+                    updateStatus('  加密大小: ' + encryptedContent.byteLength + ' 字节', 'info');
+                } catch (error) {
+                    updateStatus('✗ 代码加密失败: ' + error.message, 'error');
+                    console.error('加密错误:', error);
+                    return;
+                }
+                
+                // Step 6: Upload Encrypted File
+                updateStatus('上传加密代码...', 'info');
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('file', encryptedFile, fileName);
+                    
+                    const uploadResponse = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const uploadResult = await uploadResponse.json();
+                    
+                    if (uploadResult.success) {
+                        updateStatus('✓ 加密代码上传成功', 'success');
+                        updateStatus('  服务器消息: ' + uploadResult.message, 'info');
+                        // 刷新文件列表
+                        loadFileList(currentPath);
+                    } else {
+                        throw new Error(uploadResult.error || '上传失败，原因未知');
+                    }
+                } catch (error) {
+                    updateStatus('✗ 加密代码上传失败: ' + error.message, 'error');
+                    console.error('上传错误:', error);
+                    return;
+                }
+                
+                updateStatus('加密上传过程完成！', 'success');
+            }
+            
+
+            
+            // 文件删除函数
+            async function deleteEncryptedFile(filename) {
+                updateStatus('开始加密删除过程...', 'info');
+                
+                // Step 1: Get RSA Private Key
+                const privateKeyFile = privateKeyFileInput.files[0];
+                if (!privateKeyFile) {
+                    updateStatus('请选择RSA私钥文件', 'error');
+                    return;
+                }
+                
+                const privateKeyReader = new FileReader();
+                const privateKey = await new Promise((resolve, reject) => {
+                    privateKeyReader.onload = (e) => resolve(e.target.result);
+                    privateKeyReader.onerror = () => reject(new Error('读取私钥文件失败'));
+                    privateKeyReader.readAsText(privateKeyFile);
+                });
+                updateStatus('✓ RSA私钥已成功加载', 'success');
+                
+                // Step 2: Get full file path
+                const fullFileName = currentPath ? `${currentPath}/${filename}` : filename;
+                updateStatus('✓ 文件名: ' + fullFileName, 'info');
+                
+                // Step 3: Get Encrypted AES Key from Server
+                updateStatus('从服务器请求加密的AES密钥...', 'info');
+                
+                let encryptedAesKeyBase64;
+                try {
+                    const encryptedAesKeyResponse = await fetch('/get-encrypted-aes-key');
+                    if (!encryptedAesKeyResponse.ok) {
+                        throw new Error('获取加密AES密钥失败: ' + encryptedAesKeyResponse.statusText);
+                    }
+                    
+                    const encryptedAesKeyData = await encryptedAesKeyResponse.json();
+                    encryptedAesKeyBase64 = encryptedAesKeyData.encrypted_aes_key;
+                    updateStatus('✓ 加密AES密钥已成功接收', 'success');
+                } catch (error) {
+                    updateStatus('✗ 获取加密AES密钥失败: ' + error.message, 'error');
+                    return;
+                }
+                
+                // Step 4: Decrypt AES Key using RSA Private Key
+                updateStatus('使用RSA私钥解密AES密钥...', 'info');
+                
+                let aesKey;
+                try {
+                    // Import RSA private key
+                    const rsaPrivateKey = await CryptoHelper.importRsaPrivateKey(privateKey);
+                    
+                    // Decode encrypted AES key from base64
+                    updateStatus('  Base64字符串长度: ' + encryptedAesKeyBase64.length, 'info');
+                    
+                    const encryptedAesKey = CryptoHelper.base64ToUint8Array(encryptedAesKeyBase64);
+                    updateStatus('  ✓ 成功解码AES密钥', 'success');
+                    
+                    // Decrypt AES key
+                    updateStatus('  正在解密RSA加密数据...', 'info');
+                    updateStatus('  加密数据长度: ' + encryptedAesKey.length + ' 字节', 'info');
+                    
+                    const decryptedAesKey = await CryptoHelper.decryptRsa(rsaPrivateKey, encryptedAesKey);
+                    aesKey = new Uint8Array(decryptedAesKey);
+                    
+                    updateStatus('✓ AES密钥解密成功', 'success');
+                    updateStatus('  AES密钥大小: ' + (aesKey.length * 8) + ' 位', 'info');
+                } catch (error) {
+                    const errorMsg = error.message || '未知错误';
+                    updateStatus('✗ AES密钥解密失败: ' + errorMsg, 'error');
+                    console.error('解密错误:', error);
+                    return;
+                }
+                
+                // Step 5: Encrypt File Name using AES Key
+                updateStatus('使用AES密钥加密文件名...', 'info');
+                
+                let encryptedFile;
+                try {
+                    // Convert file name to ArrayBuffer
+                    const encoder = new TextEncoder();
+                    const fileNameBuffer = encoder.encode(fullFileName);
+                    
+                    // Generate 16-byte IV (Initialization Vector)
+                    const iv = window.crypto.getRandomValues(new Uint8Array(16));
+                    
+                    // Import AES key
+                    const aesCryptoKey = await CryptoHelper.importAesKey(aesKey);
+                    
+                    // Encrypt file name
+                    const encryptedContent = await CryptoHelper.encryptAes(aesCryptoKey, iv, fileNameBuffer);
+                    
+                    // Combine IV and encrypted content (IV first, then encrypted content, then tag)
+                    const combined = new Uint8Array(iv.length + encryptedContent.byteLength);
+                    combined.set(iv, 0);
+                    combined.set(new Uint8Array(encryptedContent), iv.length);
+                    
+                    // Create Blob for upload
+                    encryptedFile = new Blob([combined], { type: 'application/octet-stream' });
+                    
+                    updateStatus('✓ 文件名加密成功', 'success');
+                    updateStatus('  原始大小: ' + fileNameBuffer.byteLength + ' 字节', 'info');
+                    updateStatus('  加密大小: ' + encryptedContent.byteLength + ' 字节', 'info');
+                } catch (error) {
+                    updateStatus('✗ 文件名加密失败: ' + error.message, 'error');
+                    console.error('加密错误:', error);
+                    return;
+                }
+                
+                // Step 6: Send Delete Request
+                updateStatus('发送删除请求...', 'info');
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('file', encryptedFile, 'delete_request');
+                    
+                    const deleteResponse = await fetch('/delete', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const deleteResult = await deleteResponse.json();
+                    
+                    if (deleteResult.success) {
+                        updateStatus('✓ 加密删除成功', 'success');
+                        updateStatus('  服务器消息: ' + deleteResult.message, 'info');
+                        // 刷新文件列表
+                        loadFileList(currentPath);
+                    } else {
+                        throw new Error(deleteResult.error || '删除失败，原因未知');
+                    }
+                } catch (error) {
+                    updateStatus('✗ 加密删除失败: ' + error.message, 'error');
+                    console.error('删除错误:', error);
+                    return;
+                }
+                
+                updateStatus('加密删除过程完成！', 'success');
+            }
+            
+            // 上传按钮事件
+            uploadButton.addEventListener('click', async function() {
+                uploadButton.disabled = true;
+                uploadButton.textContent = '上传中...';
+                
+                try {
+                    await uploadEncryptedCode();
+                } finally {
+                    uploadButton.disabled = false;
+                    uploadButton.textContent = '加密上传';
+                }
+            });
+            
+            // 点击模态框外部关闭模态框
+            window.addEventListener('click', function(e) {
+                if (e.target === newFileModal) {
+                    newFileModal.style.display = 'none';
+                }
+            });
+            
+            // Ctrl+S 保存快捷键
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 's') {
+                    e.preventDefault();
+                    saveButton.click();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

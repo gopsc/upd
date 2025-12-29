@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encrypted Text Editor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input[type="file"] {
+            display: block;
+            margin-bottom: 10px;
+        }
+        .form-group textarea {
+            width: 100%;
+            height: 300px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        .steps {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .step {
+            margin-bottom: 10px;
+            padding: 5px 0;
+        }
+        .step.completed {
+            color: #4CAF50;
+        }
+        .step.completed::before {
+            content: "✓ ";
+            font-weight: bold;
+        }
+        .step.current {
+            font-weight: bold;
+            color: #0066cc;
+        }
+        .button-group {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Encrypted Text Editor</h1>
+        
+        <div class="steps">
+            <div class="step" id="step1">1. Select RSA Private Key</div>
+            <div class="step" id="step2">2. Enter Text Content</div>
+            <div class="step" id="step3">3. Get Encrypted AES Key</div>
+            <div class="step" id="step4">4. Decrypt AES Key</div>
+            <div class="step" id="step5">5. Encrypt Text</div>
+            <div class="step" id="step6">6. Upload Encrypted Text</div>
+        </div>
+        
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="privateKeyFile">RSA Private Key File (.pem):</label>
+                <input type="file" id="privateKeyFile" accept=".pem" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="fileName">File Name:</label>
+                <input type="text" id="fileName" placeholder="Enter file name (e.g., document.txt)" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="editor">Text Content:</label>
+                <textarea id="editor" placeholder="Enter your text content here..." required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="status">Status:</label>
+                <textarea id="status" readonly placeholder="Status messages will appear here..."></textarea>
+            </div>
+            
+            <div class="button-group">
+                <button type="submit" id="uploadBtn">Upload Encrypted Text</button>
+                <button type="button" id="clearBtn" onclick="clearEditor()">Clear Editor</button>
+            </div>
+        </form>
+        
+        <div class="status" id="result"></div>
+    </div>
+    
+    <script>
+        // Web Crypto API helper functions
+        class CryptoHelper {
+            // Check if Web Crypto API is available
+            static isCryptoAvailable() {
+                if (!window.crypto) {
+                    throw new Error('Web Crypto API is not available in this browser');
+                }
+                if (!window.crypto.subtle) {
+                    throw new Error('Web Crypto API subtle operations are not available. This may be due to insecure connection (not HTTPS) or browser restrictions.');
+                }
+                return true;
+            }
+            
+            static async importRsaPrivateKey(pem) {
+                // Check if Web Crypto API is available
+                this.isCryptoAvailable();
+                // 1. 检查 PEM 头部类型 - 先检测更具体的格式
+                let pemHeader, pemFooter, keyFormat;
+                if (pem.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+                    // 先检测PKCS#1格式，因为它的头部包含了"BEGIN PRIVATE KEY"
+                    pemHeader = "-----BEGIN RSA PRIVATE KEY-----";
+                    pemFooter = "-----END RSA PRIVATE KEY-----";
+                    keyFormat = "pkcs1";
+                    updateStatus('  ✓ Detected PKCS#1 private key format');
+                } else if (pem.includes("-----BEGIN PRIVATE KEY-----")) {
+                    pemHeader = "-----BEGIN PRIVATE KEY-----";
+                    pemFooter = "-----END PRIVATE KEY-----";
+                    keyFormat = "pkcs8";
+                    updateStatus('  ✓ Detected PKCS#8 private key format');
+                } else {
+                    throw new Error("Invalid PEM format: unknown header");
+                }
+                
+                // 2. 提取并清理 PEM 内容
+                const headerIndex = pem.indexOf(pemHeader);
+                const footerIndex = pem.indexOf(pemFooter);
+                
+                if (headerIndex === -1 || footerIndex === -1) {
+                    throw new Error("Invalid PEM format: missing header or footer");
+                }
+                
+                let pemContents = pem.slice(headerIndex + pemHeader.length, footerIndex);
+                pemContents = pemContents.replace(/\s+/g, ""); // 移除所有空白字符
+                
+                updateStatus('  PEM contents length: ' + pemContents.length);
+                updateStatus('  PEM contents: ' + pemContents.substring(0, 50) + '...');
+                
+                // 3. 确保 base64 格式正确
+                pemContents = pemContents.replace(/-/g, '+').replace(/_/g, '/');
+                const padding = (4 - pemContents.length % 4) % 4;
+                if (padding > 0) {
+                    pemContents += "=".repeat(padding);
+                }
+                
+                // 4. 解码并转换为 ArrayBuffer
+                const binaryString = window.atob(pemContents);
+                updateStatus('  ✓ Successfully decoded PEM using atob');
+                updateStatus('  Binary string length: ' + binaryString.length);
+                
+                const binaryDer = this.stringToArrayBuffer(binaryString);
+                
+                // 5. Import the private key with correct algorithm parameters
+                // 注意：对于 PKCS#1 格式，有些浏览器可能需要不同的算法名称
+                const algorithm = {
+                    name: "RSA-OAEP",
+                    hash: {
+                        name: "SHA-256"
+                    }
+                };
+                
+                // 对于 PKCS#1 格式，使用 RSA-OAEP-256 算法名称尝试
+                if (keyFormat === "pkcs1") {
+                    algorithm.name = "RSA-OAEP-256";
+                    updateStatus('  Using RSA-OAEP-256 algorithm for PKCS#1 key');
+                }
+                
+                updateStatus(`  Importing private key using ${keyFormat} format...`);
+                
+                try {
+                    return await window.crypto.subtle.importKey(
+                        keyFormat,
+                        binaryDer,
+                        algorithm,
+                        false,
+                        ["decrypt"]
+                    );
+                } catch (e) {
+                    updateStatus('  ✗ First import attempt failed: ' + (e.message || 'Unknown error'));
+                    updateStatus('  Error name: ' + (e.name || 'Unknown name'));
+                    
+                    // 尝试使用标准 RSA-OAEP 算法再次导入
+                    algorithm.name = "RSA-OAEP";
+                    updateStatus('  Trying again with standard RSA-OAEP algorithm...');
+                    
+                    return await window.crypto.subtle.importKey(
+                        keyFormat,
+                        binaryDer,
+                        algorithm,
+                        false,
+                        ["decrypt"]
+                    );
+                }
+            }
+            
+            static stringToArrayBuffer(str) {
+                const buf = new ArrayBuffer(str.length);
+                const bufView = new Uint8Array(buf);
+                for (let i = 0; i < str.length; i++) {
+                    bufView[i] = str.charCodeAt(i);
+                }
+                return buf;
+            }
+            
+            static async decryptRsa(privateKey, encryptedData) {
+                try {
+                    // 完全匹配后端的加密参数
+                    // 后端使用：asymmetric_padding.OAEP(mgf=asymmetric_padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
+                    // 注意：label 必须省略或使用 BufferSource 类型，不能使用 undefined
+                    const decryptParams = {
+                        name: "RSA-OAEP",
+                        hash: {
+                            name: "SHA-256"
+                        },
+                        mgf: {
+                            name: "MGF1",
+                            hash: {
+                                name: "SHA-256"
+                            }
+                        }
+                        // 不包含 label 属性，因为后端使用 None，意味着不使用标签
+                    };
+                    
+                    updateStatus('  Decrypt params: ' + JSON.stringify(decryptParams));
+                    updateStatus('  Private key algorithm: ' + JSON.stringify(privateKey.algorithm));
+                    
+                    return await window.crypto.subtle.decrypt(
+                        decryptParams,
+                        privateKey,
+                        encryptedData
+                    );
+                } catch (e) {
+                    updateStatus('  ✗ RSA decryption failed: ' + (e.message || 'Unknown error'));
+                    updateStatus('  Error name: ' + (e.name || 'Unknown name'));
+                    updateStatus('  Error stack: ' + (e.stack || 'No stack trace'));
+                    
+                    // 尝试使用更简单的参数 - 只指定算法名称
+                    try {
+                        updateStatus('  Trying simpler decrypt params...');
+                        return await window.crypto.subtle.decrypt(
+                            {
+                                name: "RSA-OAEP"
+                            },
+                            privateKey,
+                            encryptedData
+                        );
+                    } catch (e2) {
+                        updateStatus('  ✗ Simple params also failed: ' + (e2.message || 'Unknown error'));
+                        throw e;
+                    }
+                }
+            }
+            
+            static async encryptAes(key, iv, data) {
+                // 使用 AES-GCM 算法，与 importAesKey 保持一致
+                // AES-GCM 是 Web Crypto API 中广泛支持的算法
+                const cipher = await window.crypto.subtle.encrypt(
+                    {
+                        name: "AES-GCM",
+                        iv: iv,
+                        tagLength: 128 // GCM 标签长度，通常为 128 位
+                    },
+                    key,
+                    data
+                );
+                return cipher;
+            }
+            
+            static async importAesKey(rawKey) {
+                // 使用更标准的 AES 算法名称，确保浏览器支持
+                // AES-GCM 是 Web Crypto API 中广泛支持的算法
+                return await window.crypto.subtle.importKey(
+                    "raw",
+                    rawKey,
+                    {
+                        name: "AES-GCM",
+                        length: rawKey.length * 8 // 明确指定密钥长度
+                    },
+                    false,
+                    ["encrypt"]
+                );
+            }
+            
+            static base64ToUint8Array(base64) {
+                // 使用浏览器内置的 atob 函数解码 base64 字符串
+                updateStatus('  Base64 string: ' + base64.substring(0, 50) + '...');
+                
+                // 确保 base64 字符串是正确的格式
+                base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+                const padding = (4 - base64.length % 4) % 4;
+                if (padding > 0) {
+                    base64 += '='.repeat(padding);
+                }
+                
+                // 使用浏览器内置的 atob 函数解码
+                const binaryString = window.atob(base64);
+                updateStatus('  ✓ Successfully decoded base64 using atob');
+                updateStatus('  Binary string length: ' + binaryString.length);
+                
+                // 转换为 Uint8Array
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                return bytes;
+            }
+        }
+        
+        // Status update function
+        function updateStatus(message) {
+            const statusTextarea = document.getElementById('status');
+            statusTextarea.value += message + '\n';
+            statusTextarea.scrollTop = statusTextarea.scrollHeight;
+        }
+        
+        // Step update function
+        function updateStep(stepNumber, status) {
+            const stepElement = document.getElementById(`step${stepNumber}`);
+            if (status === 'completed') {
+                stepElement.classList.add('completed');
+                stepElement.classList.remove('current');
+            } else if (status === 'current') {
+                stepElement.classList.add('current');
+            }
+        }
+        
+        // Result update function
+        function updateResult(message, type = 'info') {
+            const resultElement = document.getElementById('result');
+            resultElement.textContent = message;
+            resultElement.className = `status ${type}`;
+        }
+        
+        // Clear editor function
+        function clearEditor() {
+            document.getElementById('editor').value = '';
+            document.getElementById('fileName').value = '';
+            document.getElementById('status').value = '';
+            updateResult('Editor cleared', 'info');
+        }
+        
+        // File upload function
+        async function uploadEncryptedText() {
+            updateResult('Starting upload process...', 'info');
+            updateStatus('Starting upload process...');
+            
+            // Step 1: Get RSA Private Key
+            updateStep(1, 'current');
+            const privateKeyFile = document.getElementById('privateKeyFile').files[0];
+            if (!privateKeyFile) {
+                updateResult('Please select an RSA private key file', 'error');
+                return;
+            }
+            
+            const privateKeyReader = new FileReader();
+            const privateKey = await new Promise((resolve, reject) => {
+                privateKeyReader.onload = (e) => resolve(e.target.result);
+                privateKeyReader.onerror = () => reject(new Error('Failed to read private key file'));
+                privateKeyReader.readAsText(privateKeyFile);
+            });
+            updateStatus('✓ RSA Private Key loaded successfully');
+            updateStep(1, 'completed');
+            
+            // Step 2: Get Text Content and File Name
+            updateStep(2, 'current');
+            const fileName = document.getElementById('fileName').value.trim();
+            const textContent = document.getElementById('editor').value;
+            
+            if (!fileName) {
+                updateResult('Please enter a file name', 'error');
+                return;
+            }
+            
+            if (!textContent) {
+                updateResult('Please enter text content', 'error');
+                return;
+            }
+            
+            updateStatus('✓ File name: ' + fileName);
+            updateStatus('✓ Text content length: ' + textContent.length + ' characters');
+            updateStatus('✓ Text content preview: ' + textContent.substring(0, 50) + (textContent.length > 50 ? '...' : ''));
+            updateStep(2, 'completed');
+            
+            // Step 3: Get Encrypted AES Key from Server
+            updateStep(3, 'current');
+            updateStatus('Requesting encrypted AES key from server...');
+            
+            let encryptedAesKeyResponse;
+            try {
+                encryptedAesKeyResponse = await fetch('/get-encrypted-aes-key');
+                if (!encryptedAesKeyResponse.ok) {
+                    throw new Error('Failed to get encrypted AES key: ' + encryptedAesKeyResponse.statusText);
+                }
+            } catch (error) {
+                updateResult('Failed to get encrypted AES key: ' + error.message, 'error');
+                updateStatus('✗ Failed to get encrypted AES key: ' + error.message);
+                return;
+            }
+            
+            const encryptedAesKeyData = await encryptedAesKeyResponse.json();
+            const encryptedAesKeyBase64 = encryptedAesKeyData.encrypted_aes_key;
+            updateStatus('✓ Encrypted AES key received successfully');
+            updateStep(3, 'completed');
+            
+            // Step 4: Decrypt AES Key using RSA Private Key
+            updateStep(4, 'current');
+            updateStatus('Decrypting AES key using RSA private key...');
+            
+            let aesKey;
+            try {
+                // Import RSA private key
+                const rsaPrivateKey = await CryptoHelper.importRsaPrivateKey(privateKey);
+                
+                // Decode encrypted AES key from base64
+                updateStatus('  Base64 string length: ' + encryptedAesKeyBase64.length);
+                updateStatus('  Base64 string: ' + encryptedAesKeyBase64.substring(0, 50) + '...');
+                
+                // 使用浏览器内置的 atob 函数解码
+                const encryptedAesKey = CryptoHelper.base64ToUint8Array(encryptedAesKeyBase64);
+                updateStatus('  ✓ Successfully decoded AES key using atob');
+                
+                // Decrypt AES key
+                updateStatus('  Decrypting RSA encrypted data...');
+                updateStatus('  Encrypted data length: ' + encryptedAesKey.length + ' bytes');
+                
+                const decryptedAesKey = await CryptoHelper.decryptRsa(rsaPrivateKey, encryptedAesKey);
+                aesKey = new Uint8Array(decryptedAesKey);
+                
+                updateStatus('✓ AES key decrypted successfully');
+                updateStatus('  AES Key Size: ' + (aesKey.length * 8) + ' bits');
+            } catch (error) {
+                const errorMsg = error.message || 'Unknown error';
+                updateResult('Failed to decrypt AES key: ' + errorMsg, 'error');
+                updateStatus('✗ Failed to decrypt AES key: ' + errorMsg);
+                console.error('Decryption error:', error);
+                return;
+            }
+            updateStep(4, 'completed');
+            
+            // Step 5: Encrypt Text using AES Key
+            updateStep(5, 'current');
+            updateStatus('Encrypting text using AES key...');
+            
+            let encryptedFile;
+            try {
+                // Convert text to ArrayBuffer
+                const encoder = new TextEncoder();
+                const textBuffer = encoder.encode(textContent);
+                
+                // Generate 16-byte IV (Initialization Vector)
+                const iv = window.crypto.getRandomValues(new Uint8Array(16));
+                
+                // Import AES key
+                const aesCryptoKey = await CryptoHelper.importAesKey(aesKey);
+                
+                // Encrypt text content
+                const encryptedContent = await CryptoHelper.encryptAes(aesCryptoKey, iv, textBuffer);
+                
+                // Combine IV and encrypted content (IV first, then encrypted content)
+                const combined = new Uint8Array(iv.length + encryptedContent.byteLength);
+                combined.set(iv, 0);
+                combined.set(new Uint8Array(encryptedContent), iv.length);
+                
+                // Create Blob for upload
+                encryptedFile = new Blob([combined], { type: 'application/octet-stream' });
+                
+                updateStatus('✓ Text encrypted successfully');
+                updateStatus('  Original Size: ' + textBuffer.byteLength + ' bytes');
+                updateStatus('  Encrypted Size: ' + encryptedContent.byteLength + ' bytes');
+            } catch (error) {
+                updateResult('Failed to encrypt text: ' + error.message, 'error');
+                updateStatus('✗ Failed to encrypt text: ' + error.message);
+                console.error('Encryption error:', error);
+                return;
+            }
+            updateStep(5, 'completed');
+            
+            // Step 6: Upload Encrypted File
+            updateStep(6, 'current');
+            updateStatus('Uploading encrypted text...');
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', encryptedFile, fileName);
+                
+                const uploadResponse = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const uploadResult = await uploadResponse.json();
+                
+                if (uploadResult.success) {
+                    updateStatus('✓ Encrypted text uploaded successfully');
+                    updateResult('Encrypted text uploaded successfully: ' + uploadResult.filename, 'success');
+                    updateStatus('  Server Message: ' + uploadResult.message);
+                } else {
+                    throw new Error(uploadResult.error || 'Upload failed for unknown reason');
+                }
+            } catch (error) {
+                updateResult('Failed to upload encrypted text: ' + error.message, 'error');
+                updateStatus('✗ Failed to upload encrypted text: ' + error.message);
+                console.error('Upload error:', error);
+                return;
+            }
+            
+            updateStep(6, 'completed');
+            updateStatus('Upload process completed successfully!');
+        }
+        
+        // Form submit handler
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            
+            try {
+                await uploadEncryptedText();
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Encrypted Text';
+            }
+        });
+    </script>
+</body>
+</html>

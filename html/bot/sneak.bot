@@ -1,0 +1,16 @@
+# SNNEAK
+#               legs                 | neck |    free    | delay
+!90  180 -90 -180  90  180 -90 -180  180 15   0 0 0 0 0 0;       # 4-legs spider robot
+45   0    45  0    45  0    45  0    90  0    0 0 0 0 0 0  400;  # stand
+45   0    45  90   45  0    45  0    90  0    0 0 0 0 0 0  100;   # right behind up
+45   0    20  90   45  0    45  0    90  0    0 0 0 0 0 0  100;   # right behind back
+45   0    20  0    45  0    45  0    90  0    0 0 0 0 0 0  400;  # right behind down
+45   0    20  0    45  90   45  0    90  0    0 0 0 0 0 0  100;   # right front  up
+45   0    20  0    90  90   45  0    90  0    0 0 0 0 0 0  100;   # right front  forward
+45   0    20  0    90  0    45  0    90  0    0 0 0 0 0 0  400;  # right front  down
+45   90   45  0    45  0    45  0    90  0    0 0 0 0 0 0  100;   # left  behind up
+20   90   45  0    45  0    45  0    90  0    0 0 0 0 0 0  100;   # left  behind back
+20   0    45  0    45  0    45  0    90  0    0 0 0 0 0 0  400;  # left  behind down
+20   0    45  0    45  0    45  90   90  0    0 0 0 0 0 0  100;   # left  front  up
+20   0    45  0    45  0    90  90   90  0    0 0 0 0 0 0  100;   # left  front  forward
+20   0    45  0    45  0    90  0    90  0    0 0 0 0 0 0  400;  # left  front  down

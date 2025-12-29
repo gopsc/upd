@@ -1,0 +1,4 @@
+# SNNEAK
+#               legs                 | neck |    free    | delay
+!90  180 -90 -180  90  180 -90 -180  180 15   0 0 0 0 0 0;       # 4-legs spider robot
+45   0    45  0    45  0    45  0    90  0    0 0 0 0 0 0  100;   # stand

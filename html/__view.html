@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Directory Listing: {path}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0; }
+        .container { max-width: 1200px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+        h1 { color: #333; margin-bottom: 20px; }
+        .path { background-color: #f8f8f8; padding: 10px; border-radius: 4px; margin-bottom: 20px; font-family: monospace; }
+        .path a { color: #0066cc; text-decoration: none; }
+        .path a:hover { text-decoration: underline; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        tr:hover { background-color: #f5f5f5; }
+        .dir-name { font-weight: bold; color: #0066cc; text-decoration: none; }
+        .dir-name:hover { text-decoration: underline; }
+        .file-name { color: #0066cc; text-decoration: none; }
+        .file-name:hover { text-decoration: underline; }
+        .file-size { text-align: right; font-family: monospace; }
+        .file-modified { font-family: monospace; font-size: 0.9em; }
+        .icon { margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Directory Listing: {path}</h1>
+        
+        <div class="path">
+            <a href="/">Home</a>
+            {path_nav}
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Size</th>
+                    <th>Modified</th>
+                </tr>
+            </thead>
+            <tbody>
+                {parent_link}
+                {file_list}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

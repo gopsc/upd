@@ -1,0 +1,28 @@
+# SNNEAK
+#               legs                 | neck |    free    | delay
+!90  180 -90 -180  90  180 -90 -180  180 15   0 0 0 0 0 0;       # 4-legs spider robot
+#45   0    45  0    45  0    45  0    90  0    0 0 0 0 0 0  50;   # stand
+
+#45   0    45  90   45  0    45  90   90  0    0 0 0 0 0 0  20;   # right behind up       & left  front  up
+#45   0    0   90   45  0    90  90   90  0    0 0 0 0 0 0  20;   # right behind forward  & left  front  forward
+#45   0    0   0    45  0    90  0    90  0    0 0 0 0 0 0  50;   # right behind down     & left  front  down
+#45   90   0   0    45  90   90  0    90  0    0 0 0 0 0 0  20;   # right front  up       & left  behind up
+#0    90   90  0    90  90   0   0    90  0    0 0 0 0 0 0  20;   # right front  forward  & left  behind forward
+#0    0    90  0    90  0    0   0    90  0    0 0 0 0 0 0  50;   # right front  down     & left  behind down
+
+
+90   0    90  90   0   0    0   90   90  0    0 0 0 0 0 0  20;   # right behind up       & left  front  up
+90   0    0   90   0   0    90  90   90  0    0 0 0 0 0 0  20;   # right behind forward  & left  front  forward
+90   0    0   0    0   0    90  0    90  0    0 0 0 0 0 0  50;   # right behind down     & left  front  down
+90   90   0   0    0   90   90  0    90  0    0 0 0 0 0 0  20;   # right front  up       & left  behind up
+0    90   90  0    90  90   0   0    90  0    0 0 0 0 0 0  20;   # 
+0    0    90  0    90  0    0   0    90  0    0 0 0 0 0 0  20;   # 
+
+#90   0    90  90   0   0    0   90   90  0    0 0 0 0 0 0  20;   # right behind up       & left  front  up
+#90   0    0   90   0   0    90  90   90  0    0 0 0 0 0 0  20;   # right behind forward  & left  front  forward
+#90   0    0   0    0   0    90  0    90  0    0 0 0 0 0 0  50;   # right behind down     & left  front  down
+#90   90   0   0    0   90   90  0    90  0    0 0 0 0 0 0  20;   # right front  up       & left  behind up
+#45   90   45  0    45  90   45  0    90  0    0 0 0 0 0 0  20;   # right front  forward  & left  behind forward
+#45   0    45  0    45  0    45  0    90  0    0 0 0 0 0 0  50;   # right front  down     & left  behind down
+
+

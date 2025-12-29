@@ -1,0 +1,19 @@
+[Unit]
+Description=Mozart IoT Python Host
+After=network.target
+Wants=network.target
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=/home/qing/___TxL/TestSuits/upd
+ExecStart=bash /home/qing/___TxL/TestSuits/upd/_run.sh
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=mozart-python-host
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encrypted Shell Script Execution</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input[type="file"] {
+            display: block;
+            margin-bottom: 10px;
+        }
+        .form-group textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        .steps {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .step {
+            margin-bottom: 10px;
+            padding: 5px 0;
+        }
+        .step.completed {
+            color: #4CAF50;
+        }
+        .step.completed::before {
+            content: "✓ ";
+            font-weight: bold;
+        }
+        .step.current {
+            font-weight: bold;
+            color: #0066cc;
+        }
+        .execution-result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .execution-result h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .execution-result pre {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Encrypted Shell Script Execution</h1>
+        
+        <div class="steps">
+            <div class="step" id="step1">1. Select RSA Private Key</div>
+            <div class="step" id="step2">2. Enter or Select Shell Script</div>
+            <div class="step" id="step3">3. Get Encrypted AES Key</div>
+            <div class="step" id="step4">4. Decrypt AES Key</div>
+            <div class="step" id="step5">5. Encrypt Shell Script</div>
+            <div class="step" id="step6">6. Execute Shell Script</div>
+        </div>
+        
+        <form id="executeForm">
+            <div class="form-group">
+                <label for="privateKeyFile">RSA Private Key File (.pem):</label>
+                <input type="file" id="privateKeyFile" accept=".pem" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="shellScript">Shell Script:</label>
+                <textarea id="shellScript" placeholder="Enter your shell script here or select a file..." required></textarea>
+                <input type="file" id="scriptFile" accept=".sh,.bash">
+            </div>
+            
+            <div class="form-group">
+                <label for="status">Status:</label>
+                <textarea id="status" readonly placeholder="Status messages will appear here..."></textarea>
+            </div>
+            
+            <button type="submit" id="executeBtn">Execute Shell Script</button>
+        </form>
+        
+        <div class="status" id="result"></div>
+        
+        <div class="execution-result" id="executionResult" style="display: none;">
+            <h3>Execution Result</h3>
+            <div><strong>Return Code:</strong> <span id="returnCode"></span></div>
+            <div>
+                <strong>Standard Output:</strong>
+                <pre id="stdout"></pre>
+            </div>
+            <div>
+                <strong>Standard Error:</strong>
+                <pre id="stderr"></pre>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Web Crypto API helper functions
+        class CryptoHelper {
+            // Check if Web Crypto API is available
+            static isCryptoAvailable() {
+                if (!window.crypto) {
+                    throw new Error('Web Crypto API is not available in this browser');
+                }
+                if (!window.crypto.subtle) {
+                    throw new Error('Web Crypto API subtle operations are not available. This may be due to insecure connection (not HTTPS) or browser restrictions.');
+                }
+                return true;
+            }
+            
+            static async importRsaPrivateKey(pem) {
+                // Check if Web Crypto API is available
+                this.isCryptoAvailable();
+                // 1. 检查 PEM 头部类型 - 先检测更具体的格式
+                let pemHeader, pemFooter, keyFormat;
+                if (pem.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+                    // 先检测PKCS#1格式，因为它的头部包含了"BEGIN PRIVATE KEY"
+                    pemHeader = "-----BEGIN RSA PRIVATE KEY-----";
+                    pemFooter = "-----END RSA PRIVATE KEY-----";
+                    keyFormat = "pkcs1";
+                    updateStatus('  ✓ Detected PKCS#1 private key format');
+                } else if (pem.includes("-----BEGIN PRIVATE KEY-----")) {
+                    pemHeader = "-----BEGIN PRIVATE KEY-----";
+                    pemFooter = "-----END PRIVATE KEY-----";
+                    keyFormat = "pkcs8";
+                    updateStatus('  ✓ Detected PKCS#8 private key format');
+                } else {
+                    throw new Error("Invalid PEM format: unknown header");
+                }
+                
+                // 2. 提取并清理 PEM 内容
+                const headerIndex = pem.indexOf(pemHeader);
+                const footerIndex = pem.indexOf(pemFooter);
+                
+                if (headerIndex === -1 || footerIndex === -1) {
+                    throw new Error("Invalid PEM format: missing header or footer");
+                }
+                
+                let pemContents = pem.slice(headerIndex + pemHeader.length, footerIndex);
+                pemContents = pemContents.replace(/\s+/g, ""); // 移除所有空白字符
+                
+                updateStatus('  PEM contents length: ' + pemContents.length);
+                updateStatus('  PEM contents: ' + pemContents.substring(0, 50) + '...');
+                
+                // 3. 确保 base64 格式正确
+                pemContents = pemContents.replace(/-/g, '+').replace(/_/g, '/');
+                const padding = (4 - pemContents.length % 4) % 4;
+                if (padding > 0) {
+                    pemContents += "=".repeat(padding);
+                }
+                
+                // 4. 解码并转换为 ArrayBuffer
+                const binaryString = window.atob(pemContents);
+                updateStatus('  ✓ Successfully decoded PEM using atob');
+                updateStatus('  Binary string length: ' + binaryString.length);
+                
+                const binaryDer = this.stringToArrayBuffer(binaryString);
+                
+                // 5. Import the private key with correct algorithm parameters
+                // 注意：对于 PKCS#1 格式，有些浏览器可能需要不同的算法名称
+                const algorithm = {
+                    name: "RSA-OAEP",
+                    hash: {
+                        name: "SHA-256"
+                    }
+                };
+                
+                // 对于 PKCS#1 格式，使用 RSA-OAEP-256 算法名称尝试
+                if (keyFormat === "pkcs1") {
+                    algorithm.name = "RSA-OAEP-256";
+                    updateStatus('  Using RSA-OAEP-256 algorithm for PKCS#1 key');
+                }
+                
+                updateStatus(`  Importing private key using ${keyFormat} format...`);
+                
+                try {
+                    return await window.crypto.subtle.importKey(
+                        keyFormat,
+                        binaryDer,
+                        algorithm,
+                        false,
+                        ["decrypt"]
+                    );
+                } catch (e) {
+                    updateStatus('  ✗ First import attempt failed: ' + (e.message || 'Unknown error'));
+                    updateStatus('  Error name: ' + (e.name || 'Unknown name'));
+                    
+                    // 尝试使用标准 RSA-OAEP 算法再次导入
+                    algorithm.name = "RSA-OAEP";
+                    updateStatus('  Trying again with standard RSA-OAEP algorithm...');
+                    
+                    return await window.crypto.subtle.importKey(
+                        keyFormat,
+                        binaryDer,
+                        algorithm,
+                        false,
+                        ["decrypt"]
+                    );
+                }
+            }
+            
+            static stringToArrayBuffer(str) {
+                const buf = new ArrayBuffer(str.length);
+                const bufView = new Uint8Array(buf);
+                for (let i = 0; i < str.length; i++) {
+                    bufView[i] = str.charCodeAt(i);
+                }
+                return buf;
+            }
+            
+            static async decryptRsa(privateKey, encryptedData) {
+                try {
+                    // 完全匹配后端的加密参数
+                    // 后端使用：asymmetric_padding.OAEP(mgf=asymmetric_padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
+                    // 注意：label 必须省略或使用 BufferSource 类型，不能使用 undefined
+                    const decryptParams = {
+                        name: "RSA-OAEP",
+                        hash: {
+                            name: "SHA-256"
+                        },
+                        mgf: {
+                            name: "MGF1",
+                            hash: {
+                                name: "SHA-256"
+                            }
+                        }
+                        // 不包含 label 属性，因为后端使用 None，意味着不使用标签
+                    };
+                    
+                    updateStatus('  Decrypt params: ' + JSON.stringify(decryptParams));
+                    updateStatus('  Private key algorithm: ' + JSON.stringify(privateKey.algorithm));
+                    
+                    return await window.crypto.subtle.decrypt(
+                        decryptParams,
+                        privateKey,
+                        encryptedData
+                    );
+                } catch (e) {
+                    updateStatus('  ✗ RSA decryption failed: ' + (e.message || 'Unknown error'));
+                    updateStatus('  Error name: ' + (e.name || 'Unknown name'));
+                    updateStatus('  Error stack: ' + (e.stack || 'No stack trace'));
+                    
+                    // 尝试使用更简单的参数 - 只指定算法名称
+                    try {
+                        updateStatus('  Trying simpler decrypt params...');
+                        return await window.crypto.subtle.decrypt(
+                            {
+                                name: "RSA-OAEP"
+                            },
+                            privateKey,
+                            encryptedData
+                        );
+                    } catch (e2) {
+                        updateStatus('  ✗ Simple params also failed: ' + (e2.message || 'Unknown error'));
+                        throw e;
+                    }
+                }
+            }
+            
+            static async encryptAes(key, iv, data) {
+                // 使用 AES-GCM 算法，与 importAesKey 保持一致
+                // AES-GCM 是 Web Crypto API 中广泛支持的算法
+                const cipher = await window.crypto.subtle.encrypt(
+                    {
+                        name: "AES-GCM",
+                        iv: iv,
+                        tagLength: 128 // GCM 标签长度，通常为 128 位
+                    },
+                    key,
+                    data
+                );
+                return cipher;
+            }
+            
+            static async importAesKey(rawKey) {
+                // 使用更标准的 AES 算法名称，确保浏览器支持
+                // AES-GCM 是 Web Crypto API 中广泛支持的算法
+                return await window.crypto.subtle.importKey(
+                    "raw",
+                    rawKey,
+                    {
+                        name: "AES-GCM",
+                        length: rawKey.length * 8 // 明确指定密钥长度
+                    },
+                    false,
+                    ["encrypt"]
+                );
+            }
+            
+            static base64ToUint8Array(base64) {
+                // 使用浏览器内置的 atob 函数解码 base64 字符串
+                updateStatus('  Base64 string: ' + base64.substring(0, 50) + '...');
+                
+                // 确保 base64 字符串是正确的格式
+                base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+                const padding = (4 - base64.length % 4) % 4;
+                if (padding > 0) {
+                    base64 += '='.repeat(padding);
+                }
+                
+                // 使用浏览器内置的 atob 函数解码
+                const binaryString = window.atob(base64);
+                updateStatus('  ✓ Successfully decoded base64 using atob');
+                updateStatus('  Binary string length: ' + binaryString.length);
+                
+                // 转换为 Uint8Array
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                return bytes;
+            }
+        }
+        
+        // Status update function
+        function updateStatus(message) {
+            const statusTextarea = document.getElementById('status');
+            statusTextarea.value += message + '\n';
+            statusTextarea.scrollTop = statusTextarea.scrollHeight;
+        }
+        
+        // Step update function
+        function updateStep(stepNumber, status) {
+            const stepElement = document.getElementById(`step${stepNumber}`);
+            if (status === 'completed') {
+                stepElement.classList.add('completed');
+                stepElement.classList.remove('current');
+            } else if (status === 'current') {
+                stepElement.classList.add('current');
+            }
+        }
+        
+        // Result update function
+        function updateResult(message, type = 'info') {
+            const resultElement = document.getElementById('result');
+            resultElement.textContent = message;
+            resultElement.className = `status ${type}`;
+        }
+        
+        // Execution result update function
+        function updateExecutionResult(result) {
+            const executionResult = document.getElementById('executionResult');
+            const returnCode = document.getElementById('returnCode');
+            const stdout = document.getElementById('stdout');
+            const stderr = document.getElementById('stderr');
+            
+            returnCode.textContent = result.returncode;
+            stdout.textContent = result.stdout;
+            stderr.textContent = result.stderr;
+            
+            executionResult.style.display = 'block';
+        }
+        
+        // Shell script execution function
+        async function executeShellScript() {
+            updateResult('Starting shell script execution process...', 'info');
+            updateStatus('Starting shell script execution process...');
+            
+            // Step 1: Get RSA Private Key
+            updateStep(1, 'current');
+            const privateKeyFile = document.getElementById('privateKeyFile').files[0];
+            if (!privateKeyFile) {
+                updateResult('Please select an RSA private key file', 'error');
+                return;
+            }
+            
+            const privateKeyReader = new FileReader();
+            const privateKey = await new Promise((resolve, reject) => {
+                privateKeyReader.onload = (e) => resolve(e.target.result);
+                privateKeyReader.onerror = () => reject(new Error('Failed to read private key file'));
+                privateKeyReader.readAsText(privateKeyFile);
+            });
+            updateStatus('✓ RSA Private Key loaded successfully');
+            updateStep(1, 'completed');
+            
+            // Step 2: Get Shell Script
+            updateStep(2, 'current');
+            let shellScript;
+            
+            // 检查是否选择了脚本文件
+            const scriptFile = document.getElementById('scriptFile').files[0];
+            if (scriptFile) {
+                // 从文件读取脚本内容
+                const scriptReader = new FileReader();
+                shellScript = await new Promise((resolve, reject) => {
+                    scriptReader.onload = (e) => resolve(e.target.result);
+                    scriptReader.onerror = () => reject(new Error('Failed to read script file'));
+                    scriptReader.readAsText(scriptFile);
+                });
+                updateStatus('✓ Shell script loaded from file: ' + scriptFile.name);
+            } else {
+                // 从文本框获取脚本内容
+                shellScript = document.getElementById('shellScript').value.trim();
+                if (!shellScript) {
+                    updateResult('Please enter a shell script or select a script file', 'error');
+                    return;
+                }
+                updateStatus('✓ Shell script obtained from text input');
+            }
+            
+            updateStatus('Script content: ' + shellScript.substring(0, 100) + (shellScript.length > 100 ? '...' : ''));
+            updateStep(2, 'completed');
+            
+            // Step 3: Get Encrypted AES Key from Server
+            updateStep(3, 'current');
+            updateStatus('Requesting encrypted AES key from server...');
+            
+            let encryptedAesKeyResponse;
+            try {
+                encryptedAesKeyResponse = await fetch('/get-encrypted-aes-key');
+                if (!encryptedAesKeyResponse.ok) {
+                    throw new Error('Failed to get encrypted AES key: ' + encryptedAesKeyResponse.statusText);
+                }
+            } catch (error) {
+                updateResult('Failed to get encrypted AES key: ' + error.message, 'error');
+                updateStatus('✗ Failed to get encrypted AES key: ' + error.message);
+                return;
+            }
+            
+            const encryptedAesKeyData = await encryptedAesKeyResponse.json();
+            const encryptedAesKeyBase64 = encryptedAesKeyData.encrypted_aes_key;
+            updateStatus('✓ Encrypted AES key received successfully');
+            updateStep(3, 'completed');
+            
+            // Step 4: Decrypt AES Key using RSA Private Key
+            updateStep(4, 'current');
+            updateStatus('Decrypting AES key using RSA private key...');
+            
+            let aesKey;
+            try {
+                // Import RSA private key
+                const rsaPrivateKey = await CryptoHelper.importRsaPrivateKey(privateKey);
+                
+                // Decode encrypted AES key from base64
+                updateStatus('  Base64 string length: ' + encryptedAesKeyBase64.length);
+                updateStatus('  Base64 string: ' + encryptedAesKeyBase64.substring(0, 50) + '...');
+                
+                // 使用浏览器内置的 atob 函数解码
+                const encryptedAesKey = CryptoHelper.base64ToUint8Array(encryptedAesKeyBase64);
+                updateStatus('  ✓ Successfully decoded AES key using atob');
+                
+                // Decrypt AES key
+                updateStatus('  Decrypting RSA encrypted data...');
+                updateStatus('  Encrypted data length: ' + encryptedAesKey.length + ' bytes');
+                
+                const decryptedAesKey = await CryptoHelper.decryptRsa(rsaPrivateKey, encryptedAesKey);
+                aesKey = new Uint8Array(decryptedAesKey);
+                
+                updateStatus('✓ AES key decrypted successfully');
+                updateStatus('  AES Key Size: ' + (aesKey.length * 8) + ' bits');
+            } catch (error) {
+                const errorMsg = error.message || 'Unknown error';
+                updateResult('Failed to decrypt AES key: ' + errorMsg, 'error');
+                updateStatus('✗ Failed to decrypt AES key: ' + errorMsg);
+                console.error('Decryption error:', error);
+                return;
+            }
+            updateStep(4, 'completed');
+            
+            // Step 5: Encrypt Shell Script using AES Key
+            updateStep(5, 'current');
+            updateStatus('Encrypting shell script using AES key...');
+            
+            let encryptedScript;
+            try {
+                // 将脚本转换为 ArrayBuffer
+                const scriptArrayBuffer = CryptoHelper.stringToArrayBuffer(shellScript);
+                
+                // Generate 16-byte IV (Initialization Vector)
+                const iv = window.crypto.getRandomValues(new Uint8Array(16));
+                
+                // Import AES key
+                const aesCryptoKey = await CryptoHelper.importAesKey(aesKey);
+                
+                // Encrypt shell script
+                const encryptedContent = await CryptoHelper.encryptAes(aesCryptoKey, iv, scriptArrayBuffer);
+                
+                // Combine IV and encrypted content (IV first, then encrypted content)
+                const combined = new Uint8Array(iv.length + encryptedContent.byteLength);
+                combined.set(iv, 0);
+                combined.set(new Uint8Array(encryptedContent), iv.length);
+                
+                // Create Blob for upload
+                encryptedScript = new Blob([combined], { type: 'application/octet-stream' });
+                
+                updateStatus('✓ Shell script encrypted successfully');
+                updateStatus('  Original Script Length: ' + shellScript.length + ' characters');
+                updateStatus('  Encrypted Size: ' + encryptedContent.byteLength + ' bytes');
+            } catch (error) {
+                updateResult('Failed to encrypt shell script: ' + error.message, 'error');
+                updateStatus('✗ Failed to encrypt shell script: ' + error.message);
+                console.error('Encryption error:', error);
+                return;
+            }
+            updateStep(5, 'completed');
+            
+            // Step 6: Execute Encrypted Shell Script
+            updateStep(6, 'current');
+            updateStatus('Executing encrypted shell script...');
+            
+            try {
+                const formData = new FormData();
+                formData.append('script', encryptedScript, 'encrypted_script.bin');
+                
+                const executeResponse = await fetch('/execute-bash', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const executeResult = await executeResponse.json();
+                
+                if (executeResult.success) {
+                    updateStatus('✓ Shell script executed successfully');
+                    updateResult('Shell script executed successfully', 'success');
+                    updateStatus('  Server Message: ' + executeResult.message);
+                    updateExecutionResult(executeResult);
+                } else {
+                    throw new Error(executeResult.error || 'Script execution failed for unknown reason');
+                }
+            } catch (error) {
+                updateResult('Failed to execute shell script: ' + error.message, 'error');
+                updateStatus('✗ Failed to execute shell script: ' + error.message);
+                console.error('Execution error:', error);
+                return;
+            }
+            
+            updateStep(6, 'completed');
+            updateStatus('Shell script execution process completed!');
+        }
+        
+        // Script file selection handler
+        document.getElementById('scriptFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('shellScript').value = e.target.result;
+                };
+                reader.readAsText(file);
+            }
+        });
+        
+        // Form submit handler
+        document.getElementById('executeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const executeBtn = document.getElementById('executeBtn');
+            executeBtn.disabled = true;
+            executeBtn.textContent = 'Executing...';
+            
+            try {
+                await executeShellScript();
+            } finally {
+                executeBtn.disabled = false;
+                executeBtn.textContent = 'Execute Shell Script';
+            }
+        });
+    </script>
+</body>
+</html>
