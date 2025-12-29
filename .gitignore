@@ -1,7 +1,7 @@
 # PRJ
 *.pem
 aes_key.txt
-*.zip
+html/downloads/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
