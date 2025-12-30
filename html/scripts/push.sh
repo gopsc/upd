@@ -1,5 +1,8 @@
 #!/bin/bash
 cd ~
+cd mybot && git pull
+cd ../mybot.gitcode && git pull
+cd ..
 mv mybot/.git .git_github
 mv mybot.gitcode/.git mybot/.git
 cd mybot
