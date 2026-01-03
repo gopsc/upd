@@ -521,11 +521,11 @@ if __name__ == '__main__':
     key_file = 'key.pem'
     
     if os.path.exists(cert_file) and os.path.exists(key_file):
-        print(f"Starting HTTPS server on {host}:{port}...")
+        print(f"Starting upd https server on {host}:{port}...")
         # 使用Flask内置服务器启动HTTPS
         app.run(host=host, port=port, ssl_context=(cert_file, key_file), debug=False)
     else:
         print(f"SSL certificates not found at {cert_file} and {key_file}")
-        print(f"Starting HTTP server on {host}:{port}...")
+        print(f"Starting upd http server on {host}:{port}...")
         # 使用Flask内置服务器启动HTTP
         app.run(host=host, port=port, debug=False)
